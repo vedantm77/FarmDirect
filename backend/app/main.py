@@ -135,6 +135,9 @@ def login(input: Credentials, db: Session = Depends(db_session)):
 
     # 1. Direct email match
     user = db.query(UserEntity).filter(UserEntity.email.ilike(login_id)).first()
+    if not user and '@' in login_id:
+        alt_email = login_id.replace('.demo', '.in') if '.demo' in login_id else login_id.replace('.in', '.demo')
+        user = db.query(UserEntity).filter(UserEntity.email.ilike(alt_email)).first()
     # 2. Direct ID match
     if not user:
         user = db.query(UserEntity).filter(UserEntity.id.ilike(login_id)).first()
@@ -142,8 +145,12 @@ def login(input: Credentials, db: Session = Depends(db_session)):
     if not user:
         alias_map = {
             'farmer': 'farmer-1',
-            'buyer': 'buyer-demo',
+            'khed': 'farmer-1',
             'fpo': 'fpo-1',
+            'baramati': 'fpo-1',
+            'junnar': 'farmer-3',
+            'mulshi': 'farmer-4',
+            'buyer': 'buyer-demo',
             'admin': 'admin-demo',
             'logistics': 'logistics-demo'
         }
@@ -157,16 +164,11 @@ def login(input: Credentials, db: Session = Depends(db_session)):
     # Verify password
     is_valid = verify_password(input.password, user.password_hash)
     if not is_valid:
-        # Check standard demo credentials or presentation credentials
-        if (user.role in ('FARMER', 'FPO') or user.id in ('farmer-1', 'farmer-3')) and input.password in ('farmer123', 'FarmDirect2026!'):
+        if input.password == 'FarmDirect2026!':
             is_valid = True
-            user.password_hash = hash_password(input.password)
-            db.commit()
-        elif (user.role == 'BUYER' or user.id == 'buyer-demo') and input.password in ('buyer123', 'FarmDirect2026!'):
+        elif (user.role in ('FARMER', 'FPO') or user.id in ('farmer-1', 'fpo-1', 'farmer-3', 'farmer-4')) and input.password == 'farmer123':
             is_valid = True
-            user.password_hash = hash_password(input.password)
-            db.commit()
-        elif input.password == 'FarmDirect2026!':
+        elif (user.role == 'BUYER' or user.id == 'buyer-demo') and input.password == 'buyer123':
             is_valid = True
 
     if not is_valid:

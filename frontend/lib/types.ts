@@ -52,6 +52,10 @@ export type Demand = {
   latitude: number;
   longitude: number;
   radius_km: number;
+  buyer_type?: string;
+  delivery_budget?: number | string;
+  preferred_window?: string;
+  handling_notes?: string;
 };
 
 export type ComplianceCheck = {

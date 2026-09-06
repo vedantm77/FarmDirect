@@ -37,10 +37,10 @@ export default function AuthPortal() {
     setPassword('');
   };
 
-  const fillQuickCredentials = (role: PortalRole) => {
+  const fillQuickCredentials = (role: PortalRole, customUser?: string) => {
     setActiveTab(role);
     if (role === 'FARMER') {
-      setUserId('farmer');
+      setUserId(customUser || 'khed');
       setPassword('farmer123');
     } else {
       setUserId('buyer');
@@ -78,7 +78,7 @@ export default function AuthPortal() {
       // Check role alignment
       const userRole = res.user.role;
       if (activeTab === 'FARMER' && userRole === 'BUYER') {
-        setError('This account is registered as a Bulk Buyer. Please switch to the Bulk Buyer Portal tab.');
+        setError('This account is registered as a Bulk Buyer / Consumer. Please switch to the Bulk Buyer / Consumer Portal tab.');
         setLoading(false);
         return;
       }
@@ -158,7 +158,7 @@ export default function AuthPortal() {
               onClick={() => handleTabChange('BUYER')}
             >
               <span className="auth-tab-icon">🏢</span>
-              <span className="auth-tab-label">Bulk Buyer Portal</span>
+              <span className="auth-tab-label">Bulk Buyer / Consumer Portal</span>
             </button>
           </div>
 
@@ -253,14 +253,14 @@ export default function AuthPortal() {
             </button>
           </form>
 
-          {/* Presentation Access Collapsible for Judges */}
+          {/* Platform Access Credentials Helper */}
           <div className="auth-presentation-helper">
             <button
               type="button"
               className="auth-helper-toggle"
               onClick={() => setShowJudgeHelp(!showJudgeHelp)}
             >
-              <span>Presentation Access Credentials</span>
+              <span>Platform Access Credentials</span>
               <span className={`auth-helper-chevron ${showJudgeHelp ? 'open' : ''}`}>▼</span>
             </button>
 
@@ -268,13 +268,13 @@ export default function AuthPortal() {
               <div className="auth-helper-content">
                 <div className="auth-helper-row">
                   <div className="auth-helper-info">
-                    <span className="auth-helper-badge farmer">👨‍🌾 Farmer / FPO</span>
-                    <code>farmer</code> / <code>farmer123</code>
+                    <span className="auth-helper-badge farmer">👨‍🌾 Khed Farmer Group</span>
+                    <code>khed</code> / <code>farmer123</code>
                   </div>
                   <button
                     type="button"
                     className="auth-helper-apply-btn"
-                    onClick={() => fillQuickCredentials('FARMER')}
+                    onClick={() => fillQuickCredentials('FARMER', 'khed')}
                   >
                     Use
                   </button>
@@ -282,7 +282,49 @@ export default function AuthPortal() {
 
                 <div className="auth-helper-row">
                   <div className="auth-helper-info">
-                    <span className="auth-helper-badge buyer">🏢 Bulk Buyer</span>
+                    <span className="auth-helper-badge farmer">🏢 Baramati FPO</span>
+                    <code>baramati</code> / <code>farmer123</code>
+                  </div>
+                  <button
+                    type="button"
+                    className="auth-helper-apply-btn"
+                    onClick={() => fillQuickCredentials('FARMER', 'baramati')}
+                  >
+                    Use
+                  </button>
+                </div>
+
+                <div className="auth-helper-row">
+                  <div className="auth-helper-info">
+                    <span className="auth-helper-badge farmer">👨‍🌾 Junnar Growers Collective</span>
+                    <code>junnar</code> / <code>farmer123</code>
+                  </div>
+                  <button
+                    type="button"
+                    className="auth-helper-apply-btn"
+                    onClick={() => fillQuickCredentials('FARMER', 'junnar')}
+                  >
+                    Use
+                  </button>
+                </div>
+
+                <div className="auth-helper-row">
+                  <div className="auth-helper-info">
+                    <span className="auth-helper-badge farmer">👨‍🌾 Mulshi Farmer Group</span>
+                    <code>mulshi</code> / <code>farmer123</code>
+                  </div>
+                  <button
+                    type="button"
+                    className="auth-helper-apply-btn"
+                    onClick={() => fillQuickCredentials('FARMER', 'mulshi')}
+                  >
+                    Use
+                  </button>
+                </div>
+
+                <div className="auth-helper-row">
+                  <div className="auth-helper-info">
+                    <span className="auth-helper-badge buyer">🏢 Bulk Buyer / Consumer</span>
                     <code>buyer</code> / <code>buyer123</code>
                   </div>
                   <button

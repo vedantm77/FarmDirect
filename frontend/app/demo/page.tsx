@@ -13,10 +13,10 @@ const workflowSteps = [
     actionText: 'Open Add Produce Form →'
   },
   {
-    title: 'Bulk Buyer Demand Placement',
-    actor: 'BULK BUYER',
+    title: 'Bulk Buyer / Consumer Demand Placement',
+    actor: 'BULK BUYER / CONSUMER',
     endpoint: 'POST /demands',
-    description: 'Institutional buyers specify required crop, volume (kg), maximum budget, quality grade, and delivery destination.',
+    description: 'Institutional buyers and consumers specify required crop, volume (kg), maximum budget, quality grade, and delivery destination.',
     actionUrl: '/buyer/dashboard',
     actionText: 'Open Demand Placement →'
   },
