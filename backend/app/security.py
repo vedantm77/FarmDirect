@@ -1,12 +1,18 @@
-﻿import os
+import os
 import jwt
 import bcrypt
+
 from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 bearer = HTTPBearer()
-SECRET = os.getenv("JWT_SECRET", "farmdirect-demo-secret-change-me")
+
+SECRET = os.getenv(
+    "JWT_SECRET",
+    "farmdirect-demo-secret-change-me"
+)
+
 ALG = "HS256"
 
 
@@ -30,24 +36,26 @@ def token(user_id: str, role: str) -> str:
         {
             "sub": user_id,
             "role": role,
-            "exp": datetime.now(timezone.utc) + timedelta(hours=8),
+            "exp": datetime.now(timezone.utc) + timedelta(hours=8)
         },
         SECRET,
-        algorithm=ALG,
+        algorithm=ALG
     )
 
 
-def current(credentials: HTTPAuthorizationCredentials = Depends(bearer)):
+def current(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer)
+):
     try:
         return jwt.decode(
             credentials.credentials,
             SECRET,
-            algorithms=[ALG],
+            algorithms=[ALG]
         )
     except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired session",
+            detail="Invalid or expired session"
         )
 
 
@@ -56,7 +64,7 @@ def role_guard(*roles):
         if payload["role"] not in roles:
             raise HTTPException(
                 status_code=403,
-                detail="This role cannot access this resource",
+                detail="This role cannot access this resource"
             )
         return payload
 
