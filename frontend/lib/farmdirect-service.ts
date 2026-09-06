@@ -7,29 +7,35 @@ import type {
 const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000';
 
 const deterministicAllocations: Allocation[] = [
-  { listing_id: 'l1', farmer_id: 'farmer-1', farmer_name: 'Khed Farmer Group (Demo)', quantity_kg: 420, price_per_kg: 27, distance_km: 24.8 },
-  { listing_id: 'l2', farmer_id: 'fpo-1', farmer_name: 'Baramati FPO (Demo)', quantity_kg: 330, price_per_kg: 26, distance_km: 85.2 },
-  { listing_id: 'l3', farmer_id: 'farmer-3', farmer_name: 'Junnar Growers Collective (Demo)', quantity_kg: 250, price_per_kg: 25, distance_km: 76.4 }
+  { listing_id: 'l1', farmer_id: 'farmer-1', farmer_name: 'Khed Farmer Group', quantity_kg: 420, price_per_kg: 27, distance_km: 24.8 },
+  { listing_id: 'l2', farmer_id: 'fpo-1', farmer_name: 'Baramati FPO', quantity_kg: 330, price_per_kg: 26, distance_km: 85.2 },
+  { listing_id: 'l3', farmer_id: 'farmer-3', farmer_name: 'Junnar Growers Collective', quantity_kg: 250, price_per_kg: 25, distance_km: 76.4 }
 ];
 
 const fallbackMatches: Match[] = [
   {
-    listing: { id: 'l1', farmer_id: 'farmer-1', farmer_name: 'Khed Farmer Group (Demo)', crop: 'Tomatoes', quantity_kg: 420, quality_grade: 'A', asking_price: 27, reliability: 96 },
+    listing: { id: 'l1', farmer_id: 'farmer-1', farmer_name: 'Khed Farmer Group', crop: 'Tomatoes', quantity_kg: 420, quality_grade: 'A', asking_price: 27, reliability: 96 },
     distance_km: 24.8,
     score: { overall: 96.2, distance: 95.0, price: 90.0, quantity: 100.0, quality: 100.0, readiness: 100.0, reliability: 96.0 },
     explanation: 'Score 96.2%: 24.8km away (95%), ₹27/kg (90%), Quality A, 96% reliability.'
   },
   {
-    listing: { id: 'l2', farmer_id: 'fpo-1', farmer_name: 'Baramati FPO (Demo)', crop: 'Tomatoes', quantity_kg: 330, quality_grade: 'A', asking_price: 26, reliability: 94 },
+    listing: { id: 'l2', farmer_id: 'fpo-1', farmer_name: 'Baramati FPO', crop: 'Tomatoes', quantity_kg: 330, quality_grade: 'A', asking_price: 26, reliability: 94 },
     distance_km: 85.2,
     score: { overall: 92.4, distance: 82.0, price: 93.3, quantity: 100.0, quality: 100.0, readiness: 100.0, reliability: 94.0 },
     explanation: 'Score 92.4%: 85.2km away (82%), ₹26/kg (93.3%), Quality A, 94% reliability.'
   },
   {
-    listing: { id: 'l3', farmer_id: 'farmer-3', farmer_name: 'Junnar Growers Collective (Demo)', crop: 'Tomatoes', quantity_kg: 250, quality_grade: 'A', asking_price: 25, reliability: 92 },
+    listing: { id: 'l3', farmer_id: 'farmer-3', farmer_name: 'Junnar Growers Collective', crop: 'Tomatoes', quantity_kg: 250, quality_grade: 'A', asking_price: 25, reliability: 92 },
     distance_km: 76.4,
     score: { overall: 91.8, distance: 84.0, price: 96.7, quantity: 100.0, quality: 100.0, readiness: 100.0, reliability: 92.0 },
     explanation: 'Score 91.8%: 76.4km away (84%), ₹25/kg (96.7%), Quality A, 92% reliability.'
+  },
+  {
+    listing: { id: 'l4', farmer_id: 'farmer-4', farmer_name: 'Mulshi Farmer Group', crop: 'Tomatoes', quantity_kg: 180, quality_grade: 'A', asking_price: 29, reliability: 97 },
+    distance_km: 34.2,
+    score: { overall: 89.5, distance: 93.0, price: 86.7, quantity: 100.0, quality: 100.0, readiness: 100.0, reliability: 97.0 },
+    explanation: 'Score 89.5%: 34.2km away (93%), ₹29/kg (86.7%), Quality A, 97% reliability.'
   }
 ];
 
@@ -40,18 +46,22 @@ export async function matchDemand(demand: Demand): Promise<{
   message: string;
   fallback: boolean;
 }> {
+  const normalizedDemand = {
+    ...demand,
+    max_price: (demand.max_price && demand.max_price > 0) ? demand.max_price : 9999
+  };
   try {
     const res = await fetch(`${base}/matching/run`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(demand)
+      body: JSON.stringify(normalizedDemand)
     });
     if (!res.ok) throw new Error(`Status ${res.status}`);
     const data = await res.json();
     return { ...data, fallback: false };
   } catch {
     return {
-      matches: fallbackMatches.filter(m => m.listing.asking_price <= demand.max_price),
+      matches: fallbackMatches.filter(m => (!demand.max_price || demand.max_price <= 0) ? true : m.listing.asking_price <= demand.max_price),
       allocations: deterministicAllocations,
       fulfilled: true,
       message: 'Fulfilled by 3 farms using prototype allocation (fallback mode).',
@@ -180,7 +190,7 @@ export async function requestLogisticsQuotes(
   } catch {
     return {
       quotes: [
-        { partner: 'Demo Logistics Partner', vehicle: 'Mini Truck', cost: 1840, eta_minutes: 135, capacity_kg: 1500, selected: true },
+        { partner: 'Express Agri Logistics', vehicle: 'Mini Truck', cost: 1840, eta_minutes: 135, capacity_kg: 1500, selected: true },
         { partner: 'Pune Route Network', vehicle: 'Tempo', cost: 2200, eta_minutes: 110, capacity_kg: 900, selected: false }
       ],
       fallback: true

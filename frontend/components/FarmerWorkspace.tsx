@@ -34,8 +34,13 @@ export default function FarmerWorkspace({ view }: { view: string }) {
     quantity_kg: 300,
     asking_price: 27,
     quality_grade: 'A',
-    ready_date: '2026-09-10'
+    ready_date: '2026-09-10',
+    pickup_window: '8:00 AM – 11:00 AM',
+    farm_location: 'Khed, Maharashtra'
   });
+  const [farmerStep, setFarmerStep] = useState<1 | 2 | 3>(1);
+  const [publishedSuccess, setPublishedSuccess] = useState<boolean>(false);
+  const [stepError, setStepError] = useState<string>('');
   const [token, setToken] = useState<string>('');
   const [profile, setProfile] = useState<any>({
     name: 'Khed Farmer Group',
@@ -57,8 +62,24 @@ export default function FarmerWorkspace({ view }: { view: string }) {
       const stored = getStoredUser();
       if (stored) {
         setProfile((prev: any) => ({ ...prev, ...stored }));
+        if (stored.location) {
+          setForm(prev => ({ ...prev, farm_location: stored.location }));
+        }
       }
       setToken(t);
+
+      // Check for prefill from "Supply this Demand"
+      const prefillRaw = sessionStorage.getItem('farmdirect-farmer-prefill');
+      if (prefillRaw) {
+        try {
+          const prefill = JSON.parse(prefillRaw);
+          setForm(prev => ({ ...prev, ...prefill }));
+          sessionStorage.removeItem('farmdirect-farmer-prefill');
+        } catch {
+          // keep defaults
+        }
+      }
+
       if (!t) return;
 
       await refreshAllData(t);
@@ -79,6 +100,14 @@ export default function FarmerWorkspace({ view }: { view: string }) {
 
     init();
   }, []);
+
+  useEffect(() => {
+    if (view === 'Add Produce') {
+      setPublishedSuccess(false);
+      setFarmerStep(1);
+      setStepError('');
+    }
+  }, [view]);
 
   const handleLogout = () => {
     logoutUser();
@@ -102,14 +131,20 @@ export default function FarmerWorkspace({ view }: { view: string }) {
 
   async function handlePublish() {
     setMessage('Publishing produce listing to database…');
+    const effectivePrice = form.asking_price > 0 ? Number(form.asking_price) : 27.0;
     const ok = await createProduceListing({
-      ...form,
+      crop: form.crop,
+      quantity_kg: Number(form.quantity_kg),
+      asking_price: effectivePrice,
+      quality_grade: form.quality_grade,
+      ready_date: form.ready_date,
       latitude: 18.738,
       longitude: 73.846
     }, token);
 
     if (ok) {
       setMessage(`Successfully listed ${form.quantity_kg} kg of ${form.crop}. Now active in buyer matching!`);
+      setPublishedSuccess(true);
       const l = await getFarmerListings(token);
       setListings(l);
       const a = await getFarmerAnalytics(token);
@@ -117,6 +152,48 @@ export default function FarmerWorkspace({ view }: { view: string }) {
     } else {
       setMessage('Failed to publish listing. Please check backend connection.');
     }
+  }
+
+  function handleResetWizard() {
+    setFarmerStep(1);
+    setPublishedSuccess(false);
+    setStepError('');
+    setForm({
+      crop: 'Tomatoes',
+      quantity_kg: 300,
+      asking_price: 27,
+      quality_grade: 'A',
+      ready_date: '2026-09-10',
+      pickup_window: '8:00 AM – 11:00 AM',
+      farm_location: profile.location || 'Khed, Maharashtra'
+    });
+  }
+
+  function handleStep1Continue() {
+    setStepError('');
+    if (!form.crop.trim()) {
+      setStepError('Please specify the crop name.');
+      return;
+    }
+    if (!form.quantity_kg || form.quantity_kg <= 0) {
+      setStepError('Available quantity must be greater than 0 kg.');
+      return;
+    }
+    setFarmerStep(2);
+  }
+
+  function handleStep2Continue() {
+    setStepError('');
+    // Asking price is optional; if omitted, defaults to market rate matching
+    if (!form.ready_date) {
+      setStepError('Please select a harvest ready date.');
+      return;
+    }
+    if (!form.farm_location.trim()) {
+      setStepError('Please specify the farm dispatch location.');
+      return;
+    }
+    setFarmerStep(3);
   }
 
   async function handleUpdateListing(e: React.FormEvent) {
@@ -417,73 +494,347 @@ export default function FarmerWorkspace({ view }: { view: string }) {
             </div>
           )}
 
-          {/* 3. ADD PRODUCE */}
+          {/* 3. ADD PRODUCE (PROGRESSIVE 3-STEP WORKFLOW) */}
           {view === 'Add Produce' && (
             <>
-              <p>Publish harvest supply to participate in direct AI multi-farm matching with verified institutional buyers.</p>
-              <div className="form" style={{ marginTop: 12 }}>
-                <label className="field">
-                  Crop Name
-                  <input
-                    value={form.crop}
-                    onChange={e => setForm({ ...form, crop: e.target.value })}
-                    placeholder="e.g. Tomatoes, Onions, Spinach"
-                  />
-                </label>
+              {publishedSuccess ? (
+                <div style={{ textAlign: 'center', padding: '30px 10px' }}>
+                  <div style={{
+                    width: 68,
+                    height: 68,
+                    margin: '0 auto 16px',
+                    borderRadius: '50%',
+                    background: '#dcfce7',
+                    color: '#166534',
+                    display: 'grid',
+                    placeItems: 'center',
+                    fontSize: 32,
+                    fontWeight: 800
+                  }}>
+                    ✓
+                  </div>
+                  <h2 style={{ fontSize: 26, margin: '0 0 6px', color: 'var(--navy)' }}>Harvest Listing Published!</h2>
+                  <p style={{ fontSize: 15, margin: '0 0 16px' }}>
+                    <strong>{form.quantity_kg} kg {form.crop}</strong> (Grade {form.quality_grade}) listed at <strong>₹{form.asking_price}/kg</strong>.<br />
+                    <span style={{ color: 'var(--muted)', fontSize: 13 }}>
+                      Your harvest is now active in the matching engine for nearby institutional buyer allocations and carrier dispatch.
+                    </span>
+                  </p>
 
-                <label className="field">
-                  Available Quantity (kg)
-                  <input
-                    type="number"
-                    value={form.quantity_kg}
-                    onChange={e => setForm({ ...form, quantity_kg: Number(e.target.value) })}
-                  />
-                </label>
+                  <div style={{ maxWidth: 440, margin: '0 auto 24px', background: '#f8fafc', border: '1px solid var(--line)', borderRadius: 12, padding: 18, textAlign: 'left' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 14 }}>
+                      <span style={{ color: 'var(--muted)' }}>Crop & Quality:</span>
+                      <strong>{form.crop} (Grade {form.quality_grade})</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 14 }}>
+                      <span style={{ color: 'var(--muted)' }}>Available Volume:</span>
+                      <strong>{form.quantity_kg} kg</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 14 }}>
+                      <span style={{ color: 'var(--muted)' }}>Direct Asking Price:</span>
+                      <strong>₹{form.asking_price} / kg</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 14 }}>
+                      <span style={{ color: 'var(--muted)' }}>Scheduled Pickup:</span>
+                      <strong>{form.ready_date} ({form.pickup_window})</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 14 }}>
+                      <span style={{ color: 'var(--muted)' }}>Dispatch Point:</span>
+                      <strong>{form.farm_location}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--line)', paddingTop: 8, fontSize: 16 }}>
+                      <span><b>Projected Gross Farmgate:</b></span>
+                      <strong style={{ color: 'var(--green)' }}>₹{(form.quantity_kg * form.asking_price).toLocaleString()}</strong>
+                    </div>
+                  </div>
 
-                <label className="field">
-                  Asking Price / kg (₹)
-                  <input
-                    type="number"
-                    value={form.asking_price}
-                    onChange={e => setForm({ ...form, asking_price: Number(e.target.value) })}
-                  />
-                </label>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <a href="/farmer/produce" style={{ textDecoration: 'none' }}>
+                      <button className="button green">
+                        View in My Produce →
+                      </button>
+                    </a>
+                    <button className="button" onClick={handleResetWizard}>
+                      + List Another Harvest
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="pagehead">
+                    <p style={{ color: 'var(--muted)', margin: '0 0 14px', fontSize: 13 }}>
+                      Publish harvest supply to participate in direct AI multi-farm matching with verified institutional buyers.
+                    </p>
+                  </div>
 
-                <label className="field">
-                  Quality Grade
-                  <select
-                    value={form.quality_grade}
-                    onChange={e => setForm({ ...form, quality_grade: e.target.value })}
-                  >
-                    <option value="A">Grade A (Premium)</option>
-                    <option value="B">Grade B (Standard)</option>
-                    <option value="C">Grade C (Processing)</option>
-                  </select>
-                </label>
+                  {/* Stepper bar (3 steps) */}
+                  <div className="stepper" style={{ marginTop: 6 }}>
+                    {[1, 2, 3].map(stepNum => (
+                      <span key={stepNum} className={`stepdot ${stepNum <= farmerStep ? 'on' : ''}`} />
+                    ))}
+                  </div>
+                  <span className="chip">STEP {farmerStep} OF 3</span>
 
-                <label className="field">
-                  Ready Date for Pickup
-                  <input
-                    type="date"
-                    value={form.ready_date}
-                    onChange={e => setForm({ ...form, ready_date: e.target.value })}
-                  />
-                </label>
+                  {stepError && (
+                    <div style={{ background: '#fee2e2', border: '1px solid #fecaca', color: '#991b1b', padding: '10px 14px', borderRadius: 8, marginBottom: 14, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>⚠️</span>
+                      <span>{stepError}</span>
+                    </div>
+                  )}
 
-                <label className="field">
-                  Pickup Time Window
-                  <input value="8:00 AM – 11:00 AM" readOnly />
-                </label>
-              </div>
+                  {/* Step 1: Produce & Quality Grade */}
+                  {farmerStep === 1 && (
+                    <div className="step-content">
+                      <h3 style={{ fontSize: 18, margin: '8px 0 4px' }}>Produce & Quality Grade</h3>
+                      <p style={{ color: 'var(--muted)', margin: '0 0 16px', fontSize: 13 }}>
+                        Specify the crop variety, available harvest quantity, and quality grading standard.
+                      </p>
 
-              <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
-                <button className="button green" onClick={handlePublish}>
-                  Publish Produce Listing →
-                </button>
-                <a href="/farmer/produce" style={{ textDecoration: 'none' }}>
-                  <button className="button">View All My Produce</button>
-                </a>
-              </div>
+                      <div className="form">
+                        <label className="field">
+                          Crop Name
+                          <select
+                            value={['Tomatoes', 'Onions', 'Spinach'].includes(form.crop) ? form.crop : 'Custom'}
+                            onChange={e => {
+                              const val = e.target.value;
+                              if (val === 'Custom') {
+                                setForm({ ...form, crop: ['Tomatoes', 'Onions', 'Spinach'].includes(form.crop) ? '' : form.crop });
+                              } else {
+                                setForm({ ...form, crop: val });
+                              }
+                            }}
+                          >
+                            <option value="Tomatoes">Tomatoes</option>
+                            <option value="Onions">Onions</option>
+                            <option value="Spinach">Spinach</option>
+                            <option value="Custom">Custom / Other Crop…</option>
+                          </select>
+                        </label>
+
+                        {(!['Tomatoes', 'Onions', 'Spinach'].includes(form.crop) || form.crop === '') && (
+                          <label className="field">
+                            Enter Custom Crop Name
+                            <input
+                              value={form.crop}
+                              onChange={e => setForm({ ...form, crop: e.target.value })}
+                              placeholder="e.g. Potatoes, Cauliflower, Capsicum"
+                              autoFocus
+                            />
+                          </label>
+                        )}
+
+                        <label className="field">
+                          Available Quantity (kg)
+                          <input
+                            type="number"
+                            min="1"
+                            value={form.quantity_kg || ''}
+                            onChange={e => setForm({ ...form, quantity_kg: Math.max(0, Number(e.target.value)) })}
+                          />
+                          <small style={{ color: 'var(--muted)', fontSize: 11 }}>
+                            Net weight in kilograms sorted for collection
+                          </small>
+                        </label>
+
+                        <label className="field">
+                          Quality Grade
+                          <select
+                            value={form.quality_grade}
+                            onChange={e => setForm({ ...form, quality_grade: e.target.value })}
+                          >
+                            <option value="A">Grade A (Premium)</option>
+                            <option value="B">Grade B (Standard)</option>
+                            <option value="C">Grade C (Processing)</option>
+                          </select>
+                          <small style={{ color: 'var(--muted)', fontSize: 11 }}>
+                            APMC direct-marketing quality classification
+                          </small>
+                        </label>
+                      </div>
+
+                      <div style={{ marginTop: 22, display: 'flex', justifyContent: 'flex-end' }}>
+                        <button className="button green" onClick={handleStep1Continue}>
+                          Continue to Pricing & Logistics →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 2: Pricing & Logistics */}
+                  {farmerStep === 2 && (
+                    <div className="step-content">
+                      <h3 style={{ fontSize: 18, margin: '8px 0 4px' }}>Farmgate Pricing & Logistics</h3>
+                      <p style={{ color: 'var(--muted)', margin: '0 0 16px', fontSize: 13 }}>
+                        Set your direct farmgate asking price and define scheduled pickup window for third-party logistics.
+                      </p>
+
+                      <div className="form">
+                        <label className="field" style={{ gridColumn: 'span 2' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>Asking Price / Target (₹/kg) <small style={{ color: 'var(--muted)', fontWeight: 400 }}>(Optional)</small></span>
+                            <span style={{ fontWeight: 700, color: form.asking_price > 0 ? 'var(--green)' : 'var(--muted)' }}>
+                              {form.asking_price > 0 ? `₹${form.asking_price}/kg` : 'Open / Market Rate'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 4 }}>
+                            <input
+                              type="range"
+                              min="15"
+                              max="60"
+                              step="1"
+                              value={form.asking_price || 27}
+                              onChange={e => setForm({ ...form, asking_price: Number(e.target.value) })}
+                              style={{ flex: 1, accentColor: 'var(--green)', cursor: 'pointer' }}
+                            />
+                            <input
+                              type="number"
+                              min="1"
+                              placeholder="e.g. 27"
+                              value={form.asking_price || ''}
+                              onChange={e => setForm({ ...form, asking_price: e.target.value ? Math.max(0, Number(e.target.value)) : 0 })}
+                              style={{ width: 110 }}
+                            />
+                            {form.asking_price > 0 && (
+                              <button
+                                type="button"
+                                className="button"
+                                style={{ padding: '6px 10px', fontSize: 11 }}
+                                onClick={() => setForm({ ...form, asking_price: 0 })}
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                            <span>Min: ₹15/kg</span>
+                            <span>Direct farmgate rate · Leave empty for open buyer bidding / market price</span>
+                            <span>Max: ₹60/kg</span>
+                          </div>
+                        </label>
+
+                        <label className="field">
+                          Ready Date for Pickup
+                          <input
+                            type="date"
+                            value={form.ready_date}
+                            onChange={e => setForm({ ...form, ready_date: e.target.value })}
+                          />
+                          <small style={{ color: 'var(--muted)', fontSize: 11 }}>
+                            Date when crates are ready for 3PL vehicle arrival
+                          </small>
+                        </label>
+
+                        <label className="field">
+                          Pickup Time Window
+                          <select
+                            value={form.pickup_window}
+                            onChange={e => setForm({ ...form, pickup_window: e.target.value })}
+                          >
+                            <option value="8:00 AM – 11:00 AM">8:00 AM – 11:00 AM (Morning Slot)</option>
+                            <option value="11:00 AM – 2:00 PM">11:00 AM – 2:00 PM (Mid-day Slot)</option>
+                            <option value="2:00 PM – 5:00 PM">2:00 PM – 5:00 PM (Afternoon Slot)</option>
+                          </select>
+                          <small style={{ color: 'var(--muted)', fontSize: 11 }}>
+                            Coordinated with regional mini-truck collection circuit
+                          </small>
+                        </label>
+
+                        <label className="field">
+                          Dispatch Location / Farm Address
+                          <input
+                            value={form.farm_location}
+                            onChange={e => setForm({ ...form, farm_location: e.target.value })}
+                            placeholder="e.g. Khed, Maharashtra"
+                          />
+                          <small style={{ color: 'var(--muted)', fontSize: 11 }}>
+                            Farm collection point for carrier driver
+                          </small>
+                        </label>
+                      </div>
+
+                      <div style={{ marginTop: 22, display: 'flex', justifyContent: 'space-between' }}>
+                        <button className="button" onClick={() => setFarmerStep(1)}>
+                          ← Back
+                        </button>
+                        <button className="button green" onClick={handleStep2Continue}>
+                          Continue to Review →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 3: Review & Publish */}
+                  {farmerStep === 3 && (
+                    <div className="step-content">
+                      <h3 style={{ fontSize: 18, margin: '8px 0 4px' }}>Review & Publish Produce Listing</h3>
+                      <p style={{ color: 'var(--muted)', margin: '0 0 16px', fontSize: 13 }}>
+                        Confirm harvest specifications and projected farmgate earnings before publishing to the direct matching network.
+                      </p>
+
+                      <div className="producepreview">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                          <div>
+                            <b style={{ fontSize: 20, color: 'var(--navy)' }}>
+                              {form.crop}
+                            </b>
+                            <span className="tag" style={{ marginLeft: 8, background: '#dcfce7', color: '#166534' }}>
+                              Grade {form.quality_grade} ({form.quality_grade === 'A' ? 'Premium' : form.quality_grade === 'B' ? 'Standard' : 'Processing'})
+                            </span>
+                            <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: 14 }}>
+                              {form.quantity_kg} kg harvest ready for direct procurement
+                            </p>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <span style={{ fontSize: 12, color: 'var(--muted)', display: 'block' }}>Projected Farmgate Earnings</span>
+                            <b style={{ fontSize: 22, color: 'var(--green)' }}>
+                              {form.asking_price > 0 ? `₹${(form.quantity_kg * form.asking_price).toLocaleString()}` : `~₹${(form.quantity_kg * 27).toLocaleString()} (Market Rate)`}
+                            </b>
+                            <small style={{ display: 'block', color: 'var(--green)', fontSize: 11, fontWeight: 700 }}>
+                              ✦ 100% Direct Payout · Zero Commission
+                            </small>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, borderTop: '1px solid #bbf7d0', marginTop: 16, paddingTop: 14 }}>
+                          <div>
+                            <small style={{ color: 'var(--muted)', display: 'block', fontSize: 11, fontWeight: 700 }}>AVAILABLE QUANTITY</small>
+                            <b style={{ fontSize: 15 }}>{form.quantity_kg} kg</b>
+                          </div>
+                          <div>
+                            <small style={{ color: 'var(--muted)', display: 'block', fontSize: 11, fontWeight: 700 }}>ASKING PRICE</small>
+                            <b style={{ fontSize: 15 }}>{form.asking_price > 0 ? `₹${form.asking_price} / kg` : 'Market Rate (Open)'}</b>
+                          </div>
+                          <div>
+                            <small style={{ color: 'var(--muted)', display: 'block', fontSize: 11, fontWeight: 700 }}>READY DATE</small>
+                            <b style={{ fontSize: 14 }}>{form.ready_date}</b>
+                          </div>
+                          <div>
+                            <small style={{ color: 'var(--muted)', display: 'block', fontSize: 11, fontWeight: 700 }}>PICKUP WINDOW</small>
+                            <b style={{ fontSize: 14 }}>{form.pickup_window}</b>
+                          </div>
+                          <div style={{ gridColumn: 'span 2' }}>
+                            <small style={{ color: 'var(--muted)', display: 'block', fontSize: 11, fontWeight: 700 }}>DISPATCH LOCATION</small>
+                            <b style={{ fontSize: 14 }}>{form.farm_location}</b>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="notice" style={{ margin: '14px 0' }}>
+                        <div>✓ <strong>Direct Marketing Exemption:</strong> This listing participates in AI multi-farm matching. Mandi intermediary charges are waived under Maharashtra direct marketing norms.</div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 22, borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+                        <button className="button" onClick={() => setFarmerStep(2)}>
+                          ← Back
+                        </button>
+                        <button className="button green" onClick={handlePublish}>
+                          Publish Produce Listing →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </>
           )}
 
@@ -510,14 +861,24 @@ export default function FarmerWorkspace({ view }: { view: string }) {
                       className="button green"
                       style={{ padding: '6px 12px', fontSize: 12 }}
                       onClick={() => {
-                        setForm({
+                        const prefillData = {
                           crop: d.crop,
                           quantity_kg: Math.min(d.quantity_kg, 400),
                           asking_price: Math.min(d.max_price, 28),
-                          quality_grade: d.quality_requirement || 'A',
-                          ready_date: d.delivery_date
-                        });
-                        window.location.href = '/farmer/produce/new';
+                          quality_grade: d.quality_requirement?.includes('B') ? 'B' : d.quality_requirement?.includes('C') ? 'C' : 'A',
+                          ready_date: d.delivery_date || '2026-09-10',
+                          pickup_window: '8:00 AM – 11:00 AM',
+                          farm_location: profile.location || 'Khed, Maharashtra'
+                        };
+                        try {
+                          sessionStorage.setItem('farmdirect-farmer-prefill', JSON.stringify(prefillData));
+                        } catch {
+                          // ignore
+                        }
+                        setForm(prev => ({ ...prev, ...prefillData }));
+                        setFarmerStep(1);
+                        setPublishedSuccess(false);
+                        router.push('/farmer/produce/new');
                       }}
                     >
                       Supply this Demand →
@@ -643,7 +1004,7 @@ export default function FarmerWorkspace({ view }: { view: string }) {
               <div style={{ background: '#f8fafc', padding: 16, borderRadius: 8, border: '1px solid var(--line)' }}>
                 <h3>{profile.name}</h3>
                 <p style={{ margin: '4px 0', color: 'var(--muted)' }}>
-                  Email: {profile.email || 'farmer@farmdirect.demo'} · District: {profile.location}, {profile.state || 'Maharashtra'} · Role: {profile.role}
+                  Email: {profile.email || 'farmer@farmdirect.in'} · District: {profile.location}, {profile.state || 'Maharashtra'} · Role: {profile.role}
                 </p>
                 <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
                   <span className="tag" style={{ background: '#dcfce7', color: '#166534' }}>
