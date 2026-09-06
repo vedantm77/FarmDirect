@@ -1,0 +1,21 @@
+services:
+  backend:
+    build: ./backend
+    ports: ["8000:8000"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://farmdirect:farmdirect_demo_only@postgres:5432/farmdirect
+      JWT_SECRET: demo-only-change-before-deploying
+    depends_on: [postgres]
+  frontend:
+    build: ./frontend
+    ports: ["3000:3000"]
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on: [backend]
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: farmdirect
+      POSTGRES_USER: farmdirect
+      POSTGRES_PASSWORD: farmdirect_demo_only
+    ports: ["5432:5432"]
