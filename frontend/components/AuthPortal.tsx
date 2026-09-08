@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authenticateUser, getStoredUser } from '../lib/farmdirect-service';
 
-type PortalRole = 'FARMER' | 'BUYER';
+type PortalRole = 'FARMER' | 'BUYER' | 'CONSUMER';
 
 export default function AuthPortal() {
   const router = useRouter();
@@ -22,17 +22,18 @@ export default function AuthPortal() {
     if (user && user.role) {
       if (user.role === 'BUYER') {
         router.replace('/buyer/dashboard');
+      } else if (user.role === 'CONSUMER') {
+        router.replace('/consumer/dashboard');
       } else if (user.role === 'FARMER' || user.role === 'FPO') {
         router.replace('/farmer/dashboard');
       }
     }
   }, [router]);
 
-  // When tab changes, clear errors and reset password
+  // When tab changes, clear errors and reset fields
   const handleTabChange = (tab: PortalRole) => {
     setActiveTab(tab);
     setError('');
-    // Clear fields or let user re-enter
     setUserId('');
     setPassword('');
   };
@@ -42,9 +43,12 @@ export default function AuthPortal() {
     if (role === 'FARMER') {
       setUserId(customUser || 'khed');
       setPassword('farmer123');
-    } else {
+    } else if (role === 'BUYER') {
       setUserId('buyer');
       setPassword('buyer123');
+    } else {
+      setUserId('consumer');
+      setPassword('consumer123');
     }
     setError('');
   };
@@ -75,15 +79,21 @@ export default function AuthPortal() {
         return;
       }
 
-      // Check role alignment
       const userRole = res.user.role;
-      if (activeTab === 'FARMER' && userRole === 'BUYER') {
-        setError('This account is registered as a Bulk Buyer / Consumer. Please switch to the Bulk Buyer / Consumer Portal tab.');
+
+      // Role check against selected portal
+      if (activeTab === 'FARMER' && (userRole === 'BUYER' || userRole === 'CONSUMER')) {
+        setError(`This account is registered as a ${userRole}. Please switch to the appropriate portal tab.`);
         setLoading(false);
         return;
       }
-      if (activeTab === 'BUYER' && (userRole === 'FARMER' || userRole === 'FPO')) {
-        setError('This account is registered as a Farmer / FPO. Please switch to the Farmer / FPO Portal tab.');
+      if (activeTab === 'BUYER' && userRole !== 'BUYER' && userRole !== 'ADMIN') {
+        setError(`This account is registered as a ${userRole}. Please switch to the appropriate portal tab.`);
+        setLoading(false);
+        return;
+      }
+      if (activeTab === 'CONSUMER' && userRole !== 'CONSUMER' && userRole !== 'ADMIN') {
+        setError(`This account is registered as a ${userRole}. Please switch to the appropriate portal tab.`);
         setLoading(false);
         return;
       }
@@ -91,6 +101,8 @@ export default function AuthPortal() {
       // Route to designated workspace
       if (userRole === 'BUYER') {
         router.push('/buyer/dashboard');
+      } else if (userRole === 'CONSUMER') {
+        router.push('/consumer/dashboard');
       } else {
         router.push('/farmer/dashboard');
       }
@@ -102,7 +114,6 @@ export default function AuthPortal() {
 
   return (
     <div className="auth-portal-wrapper">
-      {/* Background ambient elements */}
       <div className="auth-bg-overlay" />
 
       <main className="auth-portal-card-container">
@@ -133,11 +144,28 @@ export default function AuthPortal() {
               </svg>
               <span className="auth-brand-name">FarmDirect</span>
             </div>
-            <h1 className="auth-brand-subtitle">Direct Farm-to-Buyer Platform</h1>
-            <p className="auth-brand-tagline">Smart agricultural trade starts here.</p>
+            <h1 className="auth-brand-subtitle">Direct Agricultural Technology Platform</h1>
+            <p className="auth-brand-tagline">
+              Asset-light orchestration connecting farmers directly with bulk buyers & household clusters.
+            </p>
           </div>
 
-          {/* Portal Tabs */}
+          {/* Operational Model Architecture Banner */}
+          <div style={{
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            borderRadius: '6px',
+            padding: '7px 10px',
+            marginBottom: '12px',
+            fontSize: '11px',
+            color: '#166534',
+            lineHeight: 1.4,
+            textAlign: 'center'
+          }}>
+            🏢 <strong>No-Warehouse Model:</strong> FarmDirect does not own inventory or warehouses. Produce moves via direct farm pickup or short-duration partner cross-docking.
+          </div>
+
+          {/* Portal Tabs (3 Personas per SIH PS 26033) */}
           <div className="auth-tabs" role="tablist">
             <button
               type="button"
@@ -147,7 +175,7 @@ export default function AuthPortal() {
               onClick={() => handleTabChange('FARMER')}
             >
               <span className="auth-tab-icon">👨‍🌾</span>
-              <span className="auth-tab-label">Farmer / FPO Portal</span>
+              <span className="auth-tab-label">Farmer / FPO</span>
             </button>
 
             <button
@@ -158,7 +186,18 @@ export default function AuthPortal() {
               onClick={() => handleTabChange('BUYER')}
             >
               <span className="auth-tab-icon">🏢</span>
-              <span className="auth-tab-label">Bulk Buyer / Consumer Portal</span>
+              <span className="auth-tab-label">Bulk Buyer</span>
+            </button>
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'CONSUMER'}
+              className={`auth-tab-btn ${activeTab === 'CONSUMER' ? 'active' : ''}`}
+              onClick={() => handleTabChange('CONSUMER')}
+            >
+              <span className="auth-tab-icon">🛒</span>
+              <span className="auth-tab-label">Consumer</span>
             </button>
           </div>
 
@@ -190,7 +229,11 @@ export default function AuthPortal() {
                   autoComplete="username"
                   required
                   className="auth-input"
-                  placeholder="Enter your User ID"
+                  placeholder={
+                    activeTab === 'FARMER' ? 'e.g. khed, baramati, junnar'
+                    : activeTab === 'BUYER' ? 'e.g. buyer'
+                    : 'e.g. consumer or priya'
+                  }
                   value={userId}
                   onChange={(e) => setUserId(e.target.value)}
                   disabled={loading}
@@ -210,7 +253,7 @@ export default function AuthPortal() {
                   autoComplete="current-password"
                   required
                   className="auth-input has-toggle"
-                  placeholder="Enter your Password"
+                  placeholder="Enter password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
@@ -248,19 +291,21 @@ export default function AuthPortal() {
                   <span>Signing In…</span>
                 </span>
               ) : (
-                <span>Sign In</span>
+                <span>
+                  Sign In to {activeTab === 'FARMER' ? 'Farmer / FPO' : activeTab === 'BUYER' ? 'Bulk Buyer' : 'Household Consumer'} Portal
+                </span>
               )}
             </button>
           </form>
 
-          {/* Platform Access Credentials Helper */}
+          {/* Quick Platform Access Credentials Helper */}
           <div className="auth-presentation-helper">
             <button
               type="button"
               className="auth-helper-toggle"
               onClick={() => setShowJudgeHelp(!showJudgeHelp)}
             >
-              <span>Platform Access Credentials</span>
+              <span>Quick Access Credentials (All 3 Personas)</span>
               <span className={`auth-helper-chevron ${showJudgeHelp ? 'open' : ''}`}>▼</span>
             </button>
 
@@ -296,35 +341,7 @@ export default function AuthPortal() {
 
                 <div className="auth-helper-row">
                   <div className="auth-helper-info">
-                    <span className="auth-helper-badge farmer">👨‍🌾 Junnar Growers Collective</span>
-                    <code>junnar</code> / <code>farmer123</code>
-                  </div>
-                  <button
-                    type="button"
-                    className="auth-helper-apply-btn"
-                    onClick={() => fillQuickCredentials('FARMER', 'junnar')}
-                  >
-                    Use
-                  </button>
-                </div>
-
-                <div className="auth-helper-row">
-                  <div className="auth-helper-info">
-                    <span className="auth-helper-badge farmer">👨‍🌾 Mulshi Farmer Group</span>
-                    <code>mulshi</code> / <code>farmer123</code>
-                  </div>
-                  <button
-                    type="button"
-                    className="auth-helper-apply-btn"
-                    onClick={() => fillQuickCredentials('FARMER', 'mulshi')}
-                  >
-                    Use
-                  </button>
-                </div>
-
-                <div className="auth-helper-row">
-                  <div className="auth-helper-info">
-                    <span className="auth-helper-badge buyer">🏢 Bulk Buyer / Consumer</span>
+                    <span className="auth-helper-badge buyer">🏢 Bulk Buyer (Institutional)</span>
                     <code>buyer</code> / <code>buyer123</code>
                   </div>
                   <button
@@ -335,14 +352,29 @@ export default function AuthPortal() {
                     Use
                   </button>
                 </div>
+
+                <div className="auth-helper-row">
+                  <div className="auth-helper-info">
+                    <span className="auth-helper-badge" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }}>
+                      🛒 Household Consumer (Priya)
+                    </span>
+                    <code>consumer</code> / <code>consumer123</code>
+                  </div>
+                  <button
+                    type="button"
+                    className="auth-helper-apply-btn"
+                    onClick={() => fillQuickCredentials('CONSUMER')}
+                  >
+                    Use
+                  </button>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Footer Security Note */}
           <div className="auth-card-footer">
             <span className="auth-lock-icon">🔒</span>
-            <span>Secure role-based platform access</span>
+            <span>Secure JWT authentication with role-based access control</span>
           </div>
         </div>
       </main>

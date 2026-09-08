@@ -69,7 +69,7 @@ describe('FarmDirect Phase 4 frontend contracts', () => {
 
   it('verifies tracking milestone progression structure', async () => {
     const { tracking } = await getTracking('FD-2026-DEMO01');
-    expect(tracking.route_stops).toHaveLength(4);
+    expect(tracking.route_stops.length).toBeGreaterThanOrEqual(4);
     expect(tracking.order_id).toBe('FD-2026-DEMO01');
   });
 

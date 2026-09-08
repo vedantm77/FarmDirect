@@ -29,6 +29,8 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
       setIsAuthorized(false);
       if (user.role === 'BUYER') {
         router.replace('/buyer/dashboard');
+      } else if (user.role === 'CONSUMER') {
+        router.replace('/consumer/dashboard');
       } else if (user.role === 'FARMER' || user.role === 'FPO') {
         router.replace('/farmer/dashboard');
       } else {
